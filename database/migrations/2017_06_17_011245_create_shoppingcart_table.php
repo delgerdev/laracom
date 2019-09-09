@@ -12,8 +12,8 @@ class CreateShoppingcartTable extends Migration
     public function up()
     {
         Schema::create('shoppingcart', function (Blueprint $table) {
-            $table->string('identifier');
-            $table->string('instance');
+            $table->string('identifier', 150);
+            $table->string('instance', 150);
             $table->longText('content');
             $table->nullableTimestamps();
 

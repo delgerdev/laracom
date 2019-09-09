@@ -15,7 +15,7 @@ class CreateOrdersTable extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->increments('id');
-            $table->string('reference')->unique();
+            $table->string('reference', 150)->unique();
             $table->integer('courier_id')->unsigned()->index();
             $table->foreign('courier_id')->references('id')->on('couriers');
             $table->integer('customer_id')->unsigned()->index();
