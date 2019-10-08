@@ -23,9 +23,10 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
-class ProductController extends Controller
-{
-    use ProductTransformable, UploadableTrait;
+class ProductController extends Controller {
+
+    use ProductTransformable,
+        UploadableTrait;
 
     /**
      * @var ProductRepositoryInterface
@@ -68,12 +69,7 @@ class ProductController extends Controller
      * @param BrandRepositoryInterface $brandRepository
      */
     public function __construct(
-        ProductRepositoryInterface $productRepository,
-        CategoryRepositoryInterface $categoryRepository,
-        AttributeRepositoryInterface $attributeRepository,
-        AttributeValueRepositoryInterface $attributeValueRepository,
-        ProductAttribute $productAttribute,
-        BrandRepositoryInterface $brandRepository
+    ProductRepositoryInterface $productRepository, CategoryRepositoryInterface $categoryRepository, AttributeRepositoryInterface $attributeRepository, AttributeValueRepositoryInterface $attributeValueRepository, ProductAttribute $productAttribute, BrandRepositoryInterface $brandRepository
     ) {
         $this->productRepo = $productRepository;
         $this->categoryRepo = $categoryRepository;
@@ -93,8 +89,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
+    public function index() {
         $list = $this->productRepo->listProducts('id');
 
         if (request()->has('q') && request()->input('q') != '') {
@@ -102,12 +97,16 @@ class ProductController extends Controller
         }
 
         $products = $list->map(function (Product $item) {
-            return $this->transformProduct($item);
-        })->all();
+                    return $this->transformProduct($item);
+                })->all();
 
-        return view('admin.products.list', [
-            'products' => $this->productRepo->paginateArrayResults($products, 25)
-        ]);
+        $products = $this->productRepo->paginateArrayResults($products, 25);
+
+        foreach ($products as $key => $product) {
+            $product->cover = 'storage/products/covers/' . $product->cover;
+        }
+
+        return view('admin.products.list', compact('products'));
     }
 
     /**
@@ -115,8 +114,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
+    public function create() {
         $categories = $this->categoryRepo->listCategories('name', 'asc');
 
         return view('admin.products.create', [
@@ -135,8 +133,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function store(CreateProductRequest $request)
-    {
+    public function store(CreateProductRequest $request) {
         $data = $request->except('_token', '_method');
         $data['slug'] = str_slug($request->input('name'));
 
@@ -168,8 +165,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function show(int $id)
-    {
+    public function show(int $id) {
         $product = $this->productRepo->findProductById($id);
         return view('admin.products.show', compact('product'));
     }
@@ -181,14 +177,13 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function edit(int $id)
-    {
+    public function edit(int $id) {
         $product = $this->productRepo->findProductById($id);
         $productAttributes = $product->attributes()->get();
 
         $qty = $productAttributes->map(function ($item) {
-            return $item->quantity;
-        })->sum();
+                    return $item->quantity;
+                })->sum();
 
         if (request()->has('delete') && request()->has('pa')) {
             $pa = $productAttributes->where('id', request()->input('pa'))->first();
@@ -200,7 +195,9 @@ class ProductController extends Controller
         }
 
         $categories = $this->categoryRepo->listCategories('name', 'asc')->toTree();
-	
+
+        $product->cover = asset('storage/products/covers/' . $product->cover);
+
         return view('admin.products.edit', [
             'product' => $product,
             'images' => $product->images()->get(['src']),
@@ -225,32 +222,26 @@ class ProductController extends Controller
      * @return \Illuminate\Http\Response
      * @throws \App\Shop\Products\Exceptions\ProductUpdateErrorException
      */
-    public function update(UpdateProductRequest $request, int $id)
-    {
+    public function update(UpdateProductRequest $request, int $id) {
         $product = $this->productRepo->findProductById($id);
+
+
         $productRepo = new ProductRepository($product);
 
         if ($request->has('attributeValue')) {
             $this->saveProductCombinations($request, $product);
             return redirect()->route('admin.products.edit', [$id, 'combination' => 1])
-                ->with('message', 'Attribute combination created successful');
+                            ->with('message', 'Attribute combination created successful');
         }
 
         $data = $request->except(
-            'categories',
-            '_token',
-            '_method',
-            'default',
-            'image',
-            'productAttributeQuantity',
-            'productAttributePrice',
-            'attributeValue',
-            'combination'
+                'categories', '_token', '_method', 'default', 'image', 'productAttributeQuantity', 'productAttributePrice', 'attributeValue', 'combination'
         );
-
+        //dd($data);
         $data['slug'] = str_slug($request->input('name'));
 
         if ($request->hasFile('cover')) {
+            $productRepo->deleteCoverImage($request->file('cover'), $product->cover);
             $data['cover'] = $productRepo->saveCoverImage($request->file('cover'));
         }
 
@@ -267,7 +258,7 @@ class ProductController extends Controller
         $productRepo->updateProduct($data);
 
         return redirect()->route('admin.products.edit', $id)
-            ->with('message', 'Update successful');
+                        ->with('message', 'Update successful');
     }
 
     /**
@@ -278,8 +269,7 @@ class ProductController extends Controller
      * @return \Illuminate\Http\Response
      * @throws \Exception
      */
-    public function destroy($id)
-    {
+    public function destroy($id) {
         $product = $this->productRepo->findProductById($id);
         $product->categories()->sync([]);
         $productAttr = $product->attributes();
@@ -301,8 +291,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function removeImage(Request $request)
-    {
+    public function removeImage(Request $request) {
         $this->productRepo->deleteFile($request->only('product', 'image'), 'uploads');
         return redirect()->back()->with('message', 'Image delete successful');
     }
@@ -312,8 +301,7 @@ class ProductController extends Controller
      *
      * @return \Illuminate\Http\RedirectResponse
      */
-    public function removeThumbnail(Request $request)
-    {
+    public function removeThumbnail(Request $request) {
         $this->productRepo->deleteThumb($request->input('src'));
         return redirect()->back()->with('message', 'Image delete successful');
     }
@@ -323,18 +311,14 @@ class ProductController extends Controller
      * @param Product $product
      * @return boolean
      */
-    private function saveProductCombinations(Request $request, Product $product): bool
-    {
+    private function saveProductCombinations(Request $request, Product $product) {
         $fields = $request->only(
-            'productAttributeQuantity',
-            'productAttributePrice',
-            'sale_price',
-            'default'
+                'productAttributeQuantity', 'productAttributePrice', 'sale_price', 'default'
         );
 
         if ($errors = $this->validateFields($fields)) {
             return redirect()->route('admin.products.edit', [$product->id, 'combination' => 1])
-                ->withErrors($errors);
+                            ->withErrors($errors);
         }
 
         $quantity = $fields['productAttributeQuantity'];
@@ -360,14 +344,14 @@ class ProductController extends Controller
         }
 
         $productAttribute = $productRepo->saveProductAttributes(
-            new ProductAttribute(compact('quantity', 'price', 'sale_price', 'default'))
+                new ProductAttribute(compact('quantity', 'price', 'sale_price', 'default'))
         );
 
         // save the combinations
         return collect($attributeValues)->each(function ($attributeValueId) use ($productRepo, $productAttribute) {
-            $attribute = $this->attributeValueRepository->find($attributeValueId);
-            return $productRepo->saveCombination($productAttribute, $attribute);
-        })->count();
+                    $attribute = $this->attributeValueRepository->find($attributeValueId);
+                    return $productRepo->saveCombination($productAttribute, $attribute);
+                })->count();
     }
 
     /**
@@ -375,14 +359,14 @@ class ProductController extends Controller
      *
      * @return
      */
-    private function validateFields(array $data)
-    {
+    private function validateFields(array $data) {
         $validator = Validator::make($data, [
-            'productAttributeQuantity' => 'required'
+                    'productAttributeQuantity' => 'required'
         ]);
 
         if ($validator->fails()) {
             return $validator;
         }
     }
+
 }

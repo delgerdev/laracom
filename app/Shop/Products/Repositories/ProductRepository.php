@@ -19,6 +19,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Intervention\Image\Facades\Image;
+use DateTime;
 
 class ProductRepository extends BaseRepository implements ProductRepositoryInterface
 {
@@ -216,7 +218,40 @@ class ProductRepository extends BaseRepository implements ProductRepositoryInter
      */
     public function saveCoverImage(UploadedFile $file) : string
     {
-        return $file->store('products', ['disk' => 'public']);
+        $nowDateTime = new DateTime();
+        //return $file->store('products', ['disk' => 'public']);
+        
+        $randImageNamePart = rand(1000001, 9999998);
+        $folderMonthName = $nowDateTime->format('Y_m_d');
+        //$currentTimeStamp = FileController::getCurrentTimeStamp();
+        //$fileExtension = $requestFile->file($diseaseInputFileName)->extension();
+        
+        $fileExtension = $file->extension();
+        
+        if ($fileExtension == "jpeg") {
+            $fileExtension = "jpg";
+        }
+        
+        $newImgFile = Image::make($file->getPathname());
+        $contentCoverNewFilename = 'product_image_' . $folderMonthName . "_" . $randImageNamePart . '.' . $fileExtension;
+        
+        $newImgFile->fit(800, 800);
+        $newFilePathName = public_path() . "/storage/products/covers" . "/" . $contentCoverNewFilename;
+        $newImgFile->save($newFilePathName);
+        return $contentCoverNewFilename;
+    }
+    
+    public function deleteCoverImage(UploadedFile $file, $cover){
+        $backData ="";
+        
+        $deleteFilePath = public_path() . "/storage/products/covers" . "/" . $cover;
+            
+        if (file_exists($deleteFilePath)) {
+            unlink($deleteFilePath);
+            $backData .= "Бүтээгдэхүүний зураг устгагдсан.<br/>";
+        } else {
+            $backData .= "Бүтээгдэхүүний бүрхдэг зураг олдсонгүй тул устгаагүй.<br/>";
+        }
     }
 
     /**
